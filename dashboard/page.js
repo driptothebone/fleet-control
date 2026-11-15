@@ -86,7 +86,7 @@ function luminance(s){
 function mount(container,c,options={}){
   const mode=options.standalone?'standalone':'host';
   container.innerHTML=`<div class="fleet-control" data-mode="${mode}" data-tone="dark"><main>
-<div class="mb-bar"><h1 class="mb-title">Model Board</h1><span class="notice" id="notice" role="status" hidden></span><span class="sp"></span><button id="colourToggle" class="colour-switch" type="button" role="switch" aria-checked="false" title="Colour-code models, providers, values and status"><span class="track" aria-hidden="true"></span>Colour</button><button id="reload" type="button">Reload</button></div>
+<div class="mb-bar"><h1 class="mb-title">Fleet Control</h1><span class="notice" id="notice" role="status" hidden></span><span class="sp"></span><button id="colourToggle" class="colour-switch" type="button" role="switch" aria-checked="false" title="Colour-code models, providers, values and status"><span class="track" aria-hidden="true"></span>Colour</button><button id="reload" type="button">Reload</button></div>
 <p class="notice-detail" id="noticeDetail" hidden></p>
 <details class="sec" data-sec="overview" open><summary>Overview</summary>
   <div class="secbody"><div class="stats" id="stats"></div><div class="bars" id="bars"></div></div>

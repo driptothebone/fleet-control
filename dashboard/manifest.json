@@ -1,9 +1,9 @@
 {
   "name": "fleet-control",
-  "label": "Model Board",
+  "label": "Fleet Control",
   "description": "Phone-first single-host bulk model routing with host-owned inventory and confirmed preview/apply.",
   "icon": "Settings",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "tab": {
     "path": "/fleet-control",
     "position": "end"

@@ -1,10 +1,27 @@
 # Changelog
 
+## 2.1.0
+
+- Every read and save now goes through Hermes's public dashboard routes instead
+  of Hermes internals, as the plugin catalog review asked. No private imports,
+  host locks or config-backend access remain.
+- Main model changes use Hermes's own model switch. It validates the choice and
+  may ask for a cost confirmation, which the board reports instead of skipping.
+- Fast availability now comes from Hermes's own model catalog. A profile on a
+  custom endpoint shows why Fast can't be verified.
+- Each profile is rechecked right before it is saved. Hermes has no conditional
+  save yet, which is requested in
+  [hermes-agent#156100](https://github.com/NousResearch/hermes-agent/issues/156100).
+- The dashboard tab is now called **Fleet Control**. The interface is otherwise
+  unchanged.
+- This repository now holds the hackathon entry and Fleet Control together.
+  The entry as submitted is tagged `hackathon-submission`.
+
 ## 2.0.0
 
 First release of **Fleet Control**, a cleaner v2 of the hackathon Model Board
-([v1 as submitted](https://github.com/driptothebone/hermes-model-board/tree/17de6b85a7e746909d6e524b245d78ccf3187dc7)).
-It has a new repository and plugin id (`fleet-control`). v1 is unchanged.
+([v1 as submitted](https://github.com/driptothebone/fleet-control/tree/hackathon-submission)).
+It shipped in its own repository with a new plugin id (`fleet-control`).
 
 - Restores the full Model Board interface with the overview, profile table and
   phone cards, filter, All or Ticked selection, per-profile sheets and bulk

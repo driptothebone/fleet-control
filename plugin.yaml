@@ -1,6 +1,6 @@
 name: fleet-control
-version: "2.0.0"
-description: "Phone-first single-host bulk model routing with host-owned inventory, explicit preview/confirmation and same-process conflict protection. No credential-store reads."
+version: "2.1.0"
+description: "Phone-first single-host bulk model routing with explicit preview and confirmation, saved through Hermes's public dashboard routes. No credential-store reads."
 author: driptothebone
 requires_hermes: ">=0.23.0"
 provides_tools: []
