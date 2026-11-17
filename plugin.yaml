@@ -1,7 +1,23 @@
 name: fleet-control
-version: "2.1.0"
-description: "Phone-first single-host bulk model routing with explicit preview and confirmation, saved through Hermes's public dashboard routes. No credential-store reads."
+version: "2.2.0"
+description: "Phone-first bulk model routing with explicit preview and confirmation, saved through Hermes's public dashboard routes. Optionally also other machines' Hermes dashboards you configure. No credential-store reads."
 author: driptothebone
 requires_hermes: ">=0.23.0"
 provides_tools: []
 provides_hooks: []
+# Everything below is optional. With no machine address filled in, Fleet Control
+# makes no outbound calls and behaves exactly like a single-host board.
+config_schema:
+  local_label: {type: str, default: "", label: "This machine's name", description: "Name shown for this machine once another machine is configured. Defaults to This machine."}
+  machine_1_label: {type: str, default: "", label: "Machine 1 name", description: "Name shown in the board, for example Linux box."}
+  machine_1_url: {type: str, default: "", label: "Machine 1 dashboard address", description: "Base address of that machine's own Hermes dashboard, for example https://linux-box.your-tailnet.ts.net. https anywhere; plain http only on loopback or Tailscale addresses. Leave empty to turn this machine off."}
+  machine_1_token: {type: secret, env: FLEET_CONTROL_MACHINE_1_TOKEN, label: "Machine 1 dashboard token", description: "The HERMES_DASHBOARD_SESSION_TOKEN that machine's dashboard was started with. It grants full dashboard access to that machine."}
+  machine_2_label: {type: str, default: "", label: "Machine 2 name", description: "Name shown in the board, for example Linux box."}
+  machine_2_url: {type: str, default: "", label: "Machine 2 dashboard address", description: "Base address of that machine's own Hermes dashboard, for example https://linux-box.your-tailnet.ts.net. https anywhere; plain http only on loopback or Tailscale addresses. Leave empty to turn this machine off."}
+  machine_2_token: {type: secret, env: FLEET_CONTROL_MACHINE_2_TOKEN, label: "Machine 2 dashboard token", description: "The HERMES_DASHBOARD_SESSION_TOKEN that machine's dashboard was started with. It grants full dashboard access to that machine."}
+  machine_3_label: {type: str, default: "", label: "Machine 3 name", description: "Name shown in the board, for example Linux box."}
+  machine_3_url: {type: str, default: "", label: "Machine 3 dashboard address", description: "Base address of that machine's own Hermes dashboard, for example https://linux-box.your-tailnet.ts.net. https anywhere; plain http only on loopback or Tailscale addresses. Leave empty to turn this machine off."}
+  machine_3_token: {type: secret, env: FLEET_CONTROL_MACHINE_3_TOKEN, label: "Machine 3 dashboard token", description: "The HERMES_DASHBOARD_SESSION_TOKEN that machine's dashboard was started with. It grants full dashboard access to that machine."}
+  machine_4_label: {type: str, default: "", label: "Machine 4 name", description: "Name shown in the board, for example Linux box."}
+  machine_4_url: {type: str, default: "", label: "Machine 4 dashboard address", description: "Base address of that machine's own Hermes dashboard, for example https://linux-box.your-tailnet.ts.net. https anywhere; plain http only on loopback or Tailscale addresses. Leave empty to turn this machine off."}
+  machine_4_token: {type: secret, env: FLEET_CONTROL_MACHINE_4_TOKEN, label: "Machine 4 dashboard token", description: "The HERMES_DASHBOARD_SESSION_TOKEN that machine's dashboard was started with. It grants full dashboard access to that machine."}

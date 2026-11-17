@@ -88,6 +88,7 @@ function mount(container,c,options={}){
   container.innerHTML=`<div class="fleet-control" data-mode="${mode}" data-tone="dark"><main>
 <div class="mb-bar"><h1 class="mb-title">Fleet Control</h1><span class="notice" id="notice" role="status" hidden></span><span class="sp"></span><button id="colourToggle" class="colour-switch" type="button" role="switch" aria-checked="false" title="Colour-code models, providers, values and status"><span class="track" aria-hidden="true"></span>Colour</button><button id="reload" type="button">Reload</button></div>
 <p class="notice-detail" id="noticeDetail" hidden></p>
+<div class="machines" id="machines" hidden></div>
 <details class="sec" data-sec="overview" open><summary>Overview</summary>
   <div class="secbody"><div class="stats" id="stats"></div><div class="bars" id="bars"></div></div>
 </details>
@@ -106,7 +107,7 @@ function mount(container,c,options={}){
 <details class="about" data-sec="about"><summary>About this board</summary><div class="about-body">
   <p id="candidate-status"></p>
   <p>Model lists come from this Hermes host's catalogue. A listed model doesn't prove login, entitlement or that it will answer.</p>
-  <p>Single host · saved defaults only. Jobs, federation, refresh and login controls are not included.</p>
+  <p id="aboutScope">Single host · saved defaults only. Jobs, federation, refresh and login controls are not included.</p>
   <p class="mono dim" id="provenance"></p>
 </div></details></main>
 <div class="overlay" id="ov"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><header><h2 id="sheetTitle" tabindex="-1"></h2><span class="sp"></span><button id="closeSheet" type="button">Close</button></header><p class="sheet-msg" id="sheetMsg" role="status"></p><div class="body" id="sheetBody"></div><div class="sheet-result" id="sheetResult" tabindex="-1" aria-live="polite"></div></div></div>
@@ -118,9 +119,14 @@ function mount(container,c,options={}){
   const sheetOpen=()=>$('#ov').classList.contains('on');
   function toast(t){if(disposed)return;if(sheetOpen())$('#sheetMsg').textContent=t;else $('#candidate-error').textContent=t;}
   function ready(){return (S.matrix?.profiles||[]).filter(p=>p.state==='ready');}
-  const hostShown=()=>true,oneMachine=()=>true,labelFor=n=>n;
+  // Machines appear only when the owner configured another machine; otherwise every helper is a no-op.
+  const multi=()=>Array.isArray(S.raw?.machines)&&S.raw.machines.length>0;
+  const rowOf=n=>(S.matrix?.profiles||[]).find(p=>p.profile===n);
+  const hostShown=p=>!multi()||!S.host||p.host===S.host;
+  const oneMachine=list=>!multi()||new Set(list.map(n=>rowOf(n)?.host)).size<=1;
+  const labelFor=n=>{if(!multi())return n;const p=rowOf(n);return p?(p.profile_name||n)+' · '+(p.host_label||p.host||''):n;};
   function terms(){return S.q.split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);}
-  function shown(p){const t=terms();return !t.length||t.some(x=>p.profile.toLowerCase().includes(x));}
+  function shown(p){const t=terms(),name=(p.profile_name||p.profile).toLowerCase();return hostShown(p)&&(!t.length||t.some(x=>name.includes(x)));}
   function allTargets(){return ready().filter(p=>shown(p)&&!p.read_only).map(p=>p.profile);}
   function targetProfiles(){return S.scope==='all'?allTargets():[...S.sel];}
   // Follow the host theme: light canvases get darker status text.
@@ -226,7 +232,7 @@ function ctxHtml(profiles,key,task,needsCatalog){
   lastCtx=[profiles,key,task,needsCatalog];
   const items=profiles.map(n=>{const p=S.matrix.profiles.find(x=>x.profile===n);if(!p)return '';
     const cat=needsCatalog&&p.catalog?.status!=='ready'?' · catalog '+(p.catalog?.status||'unavailable'):'';
-    return `<li><span class="nm">${esc(n)}</span><span class="cur mono">${esc(currentText(key,p,task)+cat)}</span></li>`;});
+    return `<li><span class="nm">${esc(labelFor(n))}</span><span class="cur mono">${esc(currentText(key,p,task)+cat)}</span></li>`;});
   const head=items.slice(0,6).join(''),rest=items.slice(6).join('');
   return `<div class="ctx" id="sheetScope"><div class="ctx-k">Applies to ${plural(profiles.length,'profile')} <span class="dim">· currently saved</span></div><ul>${head}</ul>${rest?`<details><summary>Show ${items.length-6} more</summary><ul>${rest}</ul></details>`:''}</div>`;
 }
@@ -248,7 +254,7 @@ function renderOverview(){
     [...cnt.entries()].sort((a,b)=>b[1]-a[1]).map(([m,n])=>`<div class="barrow"><span class="l mono v-model" title="${esc(m)}">${esc(m)}</span><span class="t"><i style="width:${(n/max*100).toFixed(1)}%"></i></span><span class="n">${n}</span></div>`).join('');
 }
 function renderProfiles(){
-  const every=S.matrix?.profiles||[],all=every.filter(shown);
+  const every=(S.matrix?.profiles||[]).filter(hostShown),all=every.filter(shown);
   $('#pCount').textContent=every.length?(all.length===every.length?String(every.length):`${all.length} of ${every.length}`):'';
   if(!S.raw){$('#profiles').innerHTML=`<div class="placeholder">${c.state.error?'Profiles unavailable. Reload to try again.':'Loading profiles…'}</div>`;return;}
   const head=`<div class="prow head" aria-hidden="true"><span></span><span>Profile</span><span>Main model</span><span>Provider</span><span>Fallback</span><span>Subagents</span><span>Aux tasks</span><span>Model list</span><span>Config file</span></div>`;
@@ -260,7 +266,7 @@ function renderProfiles(){
     const eff=m.effort&&m.effort!==S.effMode?`<span class="sep"> · </span><span class="v-eff">${esc(m.effort)}</span>`:(!m.effort?'<span class="sep"> · </span><span class="v-inh">default</span>':'');
     const mix=p.drift.length?`<span class="mixnote" title="${esc(p.drift.map(d=>(d.task||d.scope)+': '+d.reason).join('\n'))}">${p.drift.length} subagent/aux ${p.drift.length===1?'route':'routes'} on other providers</span>`:'';
     return `<div class="prow ${S.sel.has(p.profile)?'selected':''}" data-p="${esc(p.profile)}">
-      <label class="c-chk" title="Tick ${esc(p.profile)}"><input type="checkbox" ${p.read_only?'disabled':''} ${S.sel.has(p.profile)?'checked':''} data-c="${esc(p.profile)}" aria-label="Tick ${esc(p.profile)}"></label>
+      <label class="c-chk" title="Tick ${esc(labelFor(p.profile))}"><input type="checkbox" ${p.read_only?'disabled':''} ${S.sel.has(p.profile)?'checked':''} data-c="${esc(p.profile)}" aria-label="Tick ${esc(labelFor(p.profile))}"></label>
       <span class="c-name name"><button type="button" title="Open ${esc(name)}">${esc(name)}</button><span class="machine-label">${esc(p.host_label||p.host||'')}</span>${mix?'<br>'+mix:''}</span>
       <span class="c-main mono" title="${esc(m.model)} (${esc(m.provider)}) · ${esc(fastText(p))}"><span class="c-l">Main</span><span class="v-model">${esc(m.model)}</span>${eff}${p.fast_mode?.current!=='normal'?`<span class="sep"> · </span><span class="${p.fast_mode?.current==='priority'?'v-fast':'v-inh'}">${esc(fastText(p))}</span>`:''}<span class="m-extra"><span class="sep"> · </span><span class="v-prov">${esc(prov(m.provider))}</span></span></span>
       <span class="c-prov v-prov" title="${esc(m.provider)}">${esc(prov(m.provider))}</span>
@@ -274,16 +280,28 @@ function renderScope(tp){
   const el=$('#scopeStrip');if(!el)return;
   if(!S.raw){el.className='scope';el.innerHTML='';return;}
   const hidden=S.scope==='sel'?[...S.sel].filter(n=>{const p=S.matrix.profiles.find(x=>x.profile===n);return p&&!shown(p);}).length:0;
+  const where=multi()?[...new Set(tp.map(n=>rowOf(n)?.host_label||rowOf(n)?.host).filter(Boolean))]:[];
   const skipped=S.scope==='all'?ready().filter(p=>shown(p)&&p.read_only).length:0;
   if(!tp.length){el.className='scope empty';el.innerHTML=`<span class="scope-n">No profiles to edit</span><span class="note">${S.scope==='sel'?'Tick profiles in the list below.':'No editable profile matches the filter.'}</span>`;return;}
   const first=tp.slice(0,4),rest=tp.slice(4);
   el.className='scope';
-  const chips=list=>list.map(n=>`<span class="chip">${esc(n)}</span>`).join('');
-  el.innerHTML=`<span class="scope-n">Editing ${plural(tp.length,'profile')}</span><span class="names" id="scopeNames">${chips(first)}</span>`+
+  const chips=list=>list.map(n=>`<span class="chip">${esc(labelFor(n))}</span>`).join('');
+  el.innerHTML=`<span class="scope-n">Editing ${plural(tp.length,'profile')}${where.length===1?' on '+esc(where[0]):where.length>1?' on '+where.length+' machines':''}</span><span class="names" id="scopeNames">${chips(first)}</span>`+
     (rest.length?`<details><summary>+${rest.length} more</summary><span class="names">${chips(rest)}</span></details>`:'')+
     (S.scope==='all'&&terms().length?'<span class="note">· profiles matching the filter</span>':'')+
     (hidden?`<span class="note">· ${hidden} hidden by the filter, still included</span>`:'')+
     (skipped?`<span class="note">· ${skipped} read-only not included</span>`:'');
+}
+function renderMachines(){
+  const el=$('#machines');if(!el)return;
+  if(!multi()){el.hidden=true;el.innerHTML='';if(S.host)S.host='';return;}
+  const ms=S.raw.machines;if(S.host&&!ms.some(m=>m.id===S.host))S.host='';
+  const word={ok:'',offline:'offline',auth_failed:'sign-in refused',refused:'address refused',unavailable:'unavailable'};
+  const btn=(id,text,bad)=>`<button type="button" data-h="${esc(id)}" class="${S.host===id?'on':''}" aria-pressed="${S.host===id}">${esc(text)}${bad?` <span class="t-bad">· ${esc(bad)}</span>`:''}</button>`;
+  const down=ms.filter(m=>m.status!=='ok');
+  el.hidden=false;
+  el.innerHTML=`<div class="seg" id="hostSeg" role="group" aria-label="Which machine to show">${btn('','All machines','')}${ms.map(m=>btn(m.id,m.label,m.status==='ok'?'':(word[m.status]||m.status))).join('')}</div>`+
+    (down.length?`<ul class="machine-notes" role="status">${down.map(m=>`<li><b>${esc(m.label)}</b>: ${esc(word[m.status]||m.status)} · ${esc(m.reason||'no answer')}. Its profiles are not shown and cannot be edited until it answers.</li>`).join('')}</ul>`:'');
 }
 function renderBulk(){
   const rows=ready(),tp=targetProfiles(),all=allTargets(),filtered=terms().length>0;
@@ -373,7 +391,7 @@ function fastEditor(profiles,label){
   const readonly=rows.some(p=>p.read_only);
   openSheet(label,`${ctxHtml(profiles,'fast')}
     <p>Current: ${esc(summarize(rows,fastText))}. This is a configured preference; existing fast windows are preserved and may also apply.</p>
-    ${blocked.map(p=>`<p class="t-warn" style="overflow-wrap:anywhere">${esc(p.profile)}: ${esc(p.read_only?'Read-only: external secrets':p.fast_mode?.reason||'Fast capability unavailable')}. Normal can clear a stored preference on unsupported routes.</p>`).join('')}
+    ${blocked.map(p=>`<p class="t-warn" style="overflow-wrap:anywhere">${esc(labelFor(p.profile))}: ${esc(p.read_only?'Read-only: external secrets':p.fast_mode?.reason||'Fast capability unavailable')}. Normal can clear a stored preference on unsupported routes.</p>`).join('')}
     <div class="field"><label for="fast_v">Fast mode (profile main default)</label><select id="fast_v"><option value="__keep">Choose Normal or Fast…</option><option value="normal" ${readonly?'disabled':''}>Normal</option><option value="priority" ${blocked.length?'disabled':''}>Fast</option></select></div>
     <p class="warnline t-warn">Fast may consume more subscription usage or cost more. Defaults for future sessions only; running sessions and gateways are unchanged.</p>
     <button id="ed_prev" type="button" class="wide" disabled>Preview changes</button><div id="ed_out"></div>`);
@@ -400,13 +418,13 @@ function fallbackEditor(names,label){
   names=Array.isArray(names)?names:[names];
   const rows=names.map(n=>S.matrix.profiles.find(x=>x.profile===n));
   const locked=rows.filter(p=>p.read_only||p.fallback_lock);
-  if(locked.length){toast(`${locked.map(p=>p.profile).join(', ')}: fallback not editable here (${locked[0].read_only?'read-only':'edit in config'}); untick to continue`,1);return}
+  if(locked.length){toast(`${locked.map(p=>labelFor(p.profile)).join(', ')}: fallback not editable here (${locked[0].read_only?'read-only':'edit in config'}); untick to continue`,1);return}
   // Start from the shared chain when every profile has the same one, else start empty.
   const key=p=>JSON.stringify((p.fallback||[]).map(f=>[f.provider,f.model]));
   const same=rows.every(p=>key(p)===key(rows[0]));
   const chain=same?(rows[0].fallback||[]).map(f=>({provider:f.provider,model:f.model})):[];
   const opts=modelOptions(names);
-  openSheet(label||`${names[0]} · Fallback`,`${ctxHtml(names,'fb',null,true)}${!same?'<p class="warnline t-warn">These profiles have different fallbacks now; the chain below replaces all of them.</p>':''}
+  openSheet(label||`${labelFor(names[0])} · Fallback`,`${ctxHtml(names,'fb',null,true)}${!same?'<p class="warnline t-warn">These profiles have different fallbacks now; the chain below replaces all of them.</p>':''}
     <div class="field"><span class="lbl">Fallback chain · tried top to bottom when the main model fails</span><div class="chain" id="fb_list"></div>
       <div class="fb-actions"><button id="fb_clear" type="button">Clear chain</button></div></div>
     <div class="field"><span class="lbl">Add a fallback · repeat to add several</span><div class="addfb">${pickerHtml('fb_add',names)}<button id="fb_addb" type="button" ${opts.length?'':'disabled'}>Add to chain</button></div></div>
@@ -438,8 +456,8 @@ function bulkBody(setting,profiles,targets){
     const aux=(p.tasks||[]).map(t=>t.editable?`<button type="button" class="row" data-aux="${esc(t.task)}"><span class="k">${esc(t.label||t.task)}</span><span class="v mono">${currentHtml('aux',p,t.task)}</span><span class="chev" aria-hidden="true"></span></button>`
       :`<div class="row static"><span class="k">${esc(t.label||t.task)}</span><span class="v mono">${currentHtml('aux',p,t.task)} <span class="dim">· read-only / undeclared task</span></span></div>`).join('');
     const st=status(p);
-    openSheet(name,`<p class="hint">Saved routes · config ${esc(st.t.toLowerCase())} · models: ${esc(catText(p))}${p.drift.length?` · ${plural(p.drift.length,'route')} on another provider than main (a configured choice, not an error)`:''}</p>${p.read_only?`<p class="warnline t-warn">${esc(p.reason||'Read-only')}</p>`:''}`+sec('Models',null,models,true)+sec('Aux tasks',(p.tasks||[]).length,aux,true));
-    $('#sheetBody').onclick=e=>{if(p.read_only){toast(p.reason||'Read-only');return;}const ed=e.target.closest('[data-ed]');if(ed){const s=SETTINGS.find(s=>s.key===ed.dataset.ed);editor(s,[name],s.targets,name+' · '+s.label);return;}const ax=e.target.closest('[data-aux]');if(ax)editor({routes:['explicit','inherit','auto']},[name],[{scope:'auxiliary',task:ax.dataset.aux}],name+' · '+taskLabel(ax.dataset.aux));};
+    openSheet(labelFor(name),`<p class="hint">Saved routes · config ${esc(st.t.toLowerCase())} · models: ${esc(catText(p))}${p.drift.length?` · ${plural(p.drift.length,'route')} on another provider than main (a configured choice, not an error)`:''}</p>${p.read_only?`<p class="warnline t-warn">${esc(p.reason||'Read-only')}</p>`:''}`+sec('Models',null,models,true)+sec('Aux tasks',(p.tasks||[]).length,aux,true));
+    $('#sheetBody').onclick=e=>{if(p.read_only){toast(p.reason||'Read-only');return;}const ed=e.target.closest('[data-ed]');if(ed){const s=SETTINGS.find(s=>s.key===ed.dataset.ed);editor(s,[name],s.targets,labelFor(name)+' · '+s.label);return;}const ax=e.target.closest('[data-aux]');if(ax)editor({routes:['explicit','inherit','auto']},[name],[{scope:'auxiliary',task:ax.dataset.aux}],labelFor(name)+' · '+taskLabel(ax.dataset.aux));};
   }
   async function preview(make){
     if(S.busy)return;S.lastAction='preview';S.lastMake=make;let draft;try{draft=view.command(S.raw,make());}catch(e){toast(e.message);return;}
@@ -475,12 +493,12 @@ function bulkBody(setting,profiles,targets){
     const fast=/Fast may consume/i.test(warning),detail=warning.replace(/^Fast may consume more usage or cost more\.\s*/i,'');
     out.innerHTML=`<section class="review" id="review" tabindex="-1" aria-labelledby="reviewTitle">
       <h3 id="reviewTitle">Review <span class="dim">· exact preview, nothing saved yet</span></h3>
-      <p class="sum">${plural(profs.length,'profile')} · ${plural(profs.reduce((n,p)=>n+p.changes.length,0),'field change')}${profs.length-changed?` · ${profs.length-changed} unchanged`:''}</p>
+      <p class="sum">${plural(profs.length,'profile')}${s.preview.machine&&multi()?' on '+esc(s.preview.machine.label):''} · ${plural(profs.reduce((n,p)=>n+p.changes.length,0),'field change')}${profs.length-changed?` · ${profs.length-changed} unchanged`:''}</p>
       ${fast?'<p class="warnline">Fast may consume more usage or cost more.</p>':''}
-      ${profs.map(p=>`<article class="change" data-preview-profile="${esc(p.profile)}"><header><b>${esc(p.profile)}</b><span class="n">${p.changes.length?plural(p.changes.length,'change'):'unchanged'}</span></header>${p.changes.length?p.changes.map(changeHtml).join('')+techHtml(p.changes):'<p class="nochange">No field changes · nothing will be written</p>'}</article>`).join('')}
+      ${profs.map(p=>`<article class="change" data-preview-profile="${esc(p.profile)}"><header><b>${esc(labelFor(p.profile))}</b><span class="n">${p.changes.length?plural(p.changes.length,'change'):'unchanged'}</span></header>${p.changes.length?p.changes.map(changeHtml).join('')+techHtml(p.changes):'<p class="nochange">No field changes · nothing will be written</p>'}</article>`).join('')}
       <div class="save-note">Saves one profile at a time — not all-or-nothing. <details><summary>What if one fails?</summary><span>Each profile is written in turn and reports its own outcome; profiles already saved are not rolled back. After a failure, reload and preview again — never replay. Host: ${esc(detail)}</span></details></div>
       <div class="applybar">
-        <label class="confirmation"><input id="confirmation" type="checkbox"><span>I reviewed these exact changes for ${profs.length===1?esc(profs[0].profile):profs.length===2?'both profiles':'all '+profs.length+' profiles'}</span></label>
+        <label class="confirmation"><input id="confirmation" type="checkbox"><span>I reviewed these exact changes for ${profs.length===1?esc(labelFor(profs[0].profile)):profs.length===2?'both profiles':'all '+profs.length+' profiles'}</span></label>
         <button id="ed_apply" type="button" class="primary" disabled>Apply to ${plural(profs.length,'profile')}</button>
         <p class="hint" id="applyHint">Tick the box to enable Apply.</p>
       </div></section>`;
@@ -495,7 +513,7 @@ function bulkBody(setting,profiles,targets){
     return `<section class="outcome ${cls}"><header>${esc(head)}</header>${r.profiles.map(p=>{const good=['applied','unchanged'].includes(p.state);
       // "applied" means every previewed field read back exactly, so the previewed values are the saved values.
       const done=p.state==='applied'?(S.lastReview?.profiles||[]).find(x=>x.profile===p.profile)?.changes||[]:[];
-      return `<article class="change" data-result-profile="${esc(p.profile)}"><b>${esc(p.profile)}</b>: <span class="state ${good?'good':'bad'}">${esc(p.state)}</span> <span class="dim">${esc(p.detail||(p.state==='unchanged'?'No change needed · readback verified':'Saved-field readback verified'))}</span>${done.length?`<div class="saved-vals">${done.map(d=>`<span>${esc(fieldLabel(d.field))}: ${human(d.field,d.after)}</span>`).join('')}</div>`:''}</article>`;}).join('')}</section>`;
+      return `<article class="change" data-result-profile="${esc(p.profile)}"><b>${esc(labelFor(p.profile))}</b>: <span class="state ${good?'good':'bad'}">${esc(p.state)}</span> <span class="dim">${esc(p.detail||(p.state==='unchanged'?'No change needed · readback verified':'Saved-field readback verified'))}</span>${done.length?`<div class="saved-vals">${done.map(d=>`<span>${esc(fieldLabel(d.field))}: ${human(d.field,d.after)}</span>`).join('')}</div>`:''}</article>`;}).join('')}</section>`;
   }
   function errorHtml(err){
     const code=(/^(\d{3}):/.exec(err)||[])[1],apply=S.lastAction==='apply';
@@ -520,9 +538,10 @@ function bulkBody(setting,profiles,targets){
     const badge=s.data?.fixture?'Synthetic fixture — not live':s.data?.available?'':!s.data&&s.busy?'Reading profiles…':'Read-only · unavailable';
     notice.textContent=badge;notice.hidden=!badge;
     const nd=$('#noticeDetail'),why=!s.data?.fixture&&s.data&&!s.data.available?(s.data.reason||'No edit authority'):'';nd.textContent=why;nd.hidden=!why;
-    $('#candidate-status').textContent=s.data?.fixture?'SYNTHETIC FIXTURE — not live. Synthetic host catalogs and real file-backend persistence only.':s.data?.available?'Native mode · authenticated local host.':!s.data&&s.busy?'Native mode · reading profiles…':'Native mode · read-only / unavailable. '+(s.data?.reason||'No edit authority');
+    $('#candidate-status').textContent=s.data?.fixture?'SYNTHETIC FIXTURE — not live. Synthetic host catalogs and real file-backend persistence only.':s.data?.available?(Array.isArray(s.data.machines)&&s.data.machines.length?'Native mode · authenticated local host plus the other machines you configured.':'Native mode · authenticated local host.'):!s.data&&s.busy?'Native mode · reading profiles…':'Native mode · read-only / unavailable. '+(s.data?.reason||'No edit authority');
     $('#provenance').textContent=s.data?.available&&!s.data?.fixture?S.matrix.provenance+' · host metadata is not proof of login, entitlement or inference':S.matrix.provenance;$('#candidate-error').textContent=s.error;
-    renderOverview();renderProfiles();renderBulk();$('#reload').disabled=s.busy;
+    renderMachines();renderOverview();renderProfiles();renderBulk();$('#reload').disabled=s.busy;
+    if(multi()){const ok=S.raw.machines.filter(m=>m.status==='ok').length;$('#aboutScope').textContent=`${plural(S.raw.machines.length,'machine')} configured, ${ok} answering · saved defaults only. Each Apply stays on one machine and goes through that machine's own Hermes dashboard. Jobs, federation, refresh and login controls are not included.`;}
     container.querySelectorAll('[data-c]').forEach(el=>{el.disabled=el.disabled||s.busy;});
     container.querySelectorAll('#sheetBody input,#sheetBody select,#sheetBody button,#closeSheet').forEach(el=>{
       if(s.applying){if(!disabledBeforeApply.has(el))disabledBeforeApply.set(el,el.disabled);el.disabled=true;}
@@ -536,6 +555,7 @@ function bulkBody(setting,profiles,targets){
     else if(!s.preview&&$('#ed_out .errpanel'))$('#ed_out').innerHTML='';
   }
   $('#pq').oninput=e=>{S.q=e.target.value;renderProfiles();renderBulk();};
+  $('#machines').onclick=e=>{const b=e.target.closest('[data-h]');if(b){closeSheet();S.host=b.dataset.h;renderMachines();renderOverview();renderProfiles();renderBulk();}};
   $('#scopeSeg').onclick=e=>{const b=e.target.closest('button');if(b){closeSheet();S.scope=b.dataset.s;renderBulk();}};
   $('#profiles').onclick=e=>{
     // A tap on the 44px label area is followed by the checkbox's own click; never open the profile for it.

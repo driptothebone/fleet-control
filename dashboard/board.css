@@ -335,6 +335,19 @@
 .fleet-control .prow .m-extra { display: none; }
 .fleet-control .prow .empty { color: var(--mb-dim); }
 .fleet-control .prow .machine-label:empty { display: none; }
+.fleet-control .prow .machine-label {
+  display: inline-block; margin-left: 6px; padding: 0 6px; vertical-align: 1px;
+  border: 1px solid var(--mb-line); border-radius: calc(var(--mb-r) * 2);
+  color: var(--mb-dim); font-size: .6875rem; font-weight: 400;
+}
+/* ---- Machines (only rendered when another machine is configured) ------ */
+.fleet-control .machines[hidden] { display: none; }
+.fleet-control .machines { margin: 0 0 10px; }
+.fleet-control .machines .seg { padding: 0; flex-wrap: wrap; }
+.fleet-control .machines .seg button + button { border-left: 0; }
+.fleet-control .machines .seg button:not(:first-child):not(:last-child) { border-radius: 0; }
+.fleet-control .bulk-note { padding: 8px 14px; font-size: .8125rem; color: var(--mb-warn-text); border-bottom: 1px solid var(--mb-line); }
+.fleet-control .machine-notes { margin: 6px 0 0; padding: 0 0 0 18px; font-size: .8125rem; color: var(--mb-warn-text); overflow-wrap: anywhere; }
 .fleet-control .tag { display: inline-flex; align-items: center; gap: 6px; font-size: .8125rem; }
 .fleet-control .dot {
   width: 7px; height: 7px; border-radius: 50%; flex: none; display: inline-block;

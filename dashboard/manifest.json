@@ -1,9 +1,9 @@
 {
   "name": "fleet-control",
   "label": "Fleet Control",
-  "description": "Phone-first single-host bulk model routing with host-owned inventory and confirmed preview/apply.",
+  "description": "Phone-first bulk model routing with host-owned inventory and confirmed preview/apply, on this host and optionally on other machines you configure.",
   "icon": "Settings",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "tab": {
     "path": "/fleet-control",
     "position": "end"

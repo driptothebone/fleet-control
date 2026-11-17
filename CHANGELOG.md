@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.2.0
+
+- Optional other machines. Fill in up to four machine slots in the plugin's
+  settings (a name, the address of that machine's own Hermes dashboard and its
+  dashboard token) and one board shows and changes profiles on all of them.
+  Saves on another machine go through that machine's Hermes dashboard.
+- With no machine configured nothing changes. There are no outbound calls or
+  machine picker. The board's responses match 2.1.0.
+- Profiles are named by machine and name, so the same profile name on two
+  machines stays two rows. A machine filter and machine labels appear once
+  another machine is configured. The scope line and review name the
+  machine.
+- Each preview and Apply stays on one machine. Selections across machines are
+  refused before any write.
+- A machine that is offline, refuses its token or redirects is shown with that
+  status and its profiles are hidden. The other machines keep working.
+- Addresses must be https, or http on loopback and Tailscale only. Tokens are
+  read through Hermes's secret API and never reach the browser.
+- Still **not a fleet transaction**. Saves are per profile and per machine.
+
 ## 2.1.0
 
 - Every read and save now goes through Hermes's public dashboard routes instead

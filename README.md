@@ -37,6 +37,69 @@ authenticated Hermes dashboard. It does not start a separate server or open a
 port. On a phone, reach it through the dashboard's existing authenticated
 HTTPS or Tailscale access.
 
+## Other machines (optional)
+
+One board can also show and change profiles on your other machines, for
+example a Linux box you reach over Tailscale. It is off until you fill in a
+machine slot. With no machine configured, Fleet Control makes no outbound calls
+and works exactly as a single-host board.
+
+Fleet Control does not install anything on the other machine. It calls that
+machine's own Hermes dashboard over the same public routes it uses locally, so
+every save on that machine goes through that machine's Hermes.
+
+1. On the other machine, run its normal Hermes dashboard with a dashboard
+   session token and reach it over your tailnet. One way is
+   [Tailscale Serve](https://tailscale.com/kb/1312/serve) in front of a loopback
+   dashboard.
+
+   ```sh
+   # on the other machine
+   hermes config set dashboard.public_url https://linux-box.your-tailnet.ts.net
+   TOKEN="$(openssl rand -hex 32)"
+   echo "$TOKEN"    # copy this, step 2 needs it
+   tailscale serve --bg 9119
+   HERMES_DASHBOARD_SESSION_TOKEN="$TOKEN" \
+     hermes dashboard --host 127.0.0.1 --port 9119 --no-open
+   ```
+
+   Hermes's dashboard guide describes this token-only setup under
+   "Deployment session-token provider". Start the dashboard with the same
+   token every time, or the board's saved copy stops working.
+
+2. On the machine that runs the board, fill in a slot in the plugin's settings
+   (Desktop **Settings, Plugins, Fleet Control**, which masks the token) or
+   with the CLI, which leaves the token in your shell history.
+
+   ```sh
+   hermes config set plugins.entries.fleet-control.settings.machine_1_label "Linux box"
+   hermes config set plugins.entries.fleet-control.settings.machine_1_url https://linux-box.your-tailnet.ts.net
+   hermes config set FLEET_CONTROL_MACHINE_1_TOKEN <the token from step 1>
+   ```
+
+   There are four slots (`machine_1` to `machine_4`). `local_label` names this
+   machine on the board. Reload the board. Changes apply without restarting
+   the dashboard.
+
+Addresses must use `https://`. Plain `http://` is accepted only for loopback,
+Tailscale addresses (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`) and `*.ts.net`
+names. Anything else is refused with a reason and never contacted.
+
+How it behaves.
+
+- Each profile is named by its machine and its name, so `alpha` on the Mac and
+  `alpha` on the Linux box are different rows. A **machine filter** and machine labels
+  appear only once another machine is configured.
+- Each preview and Apply stays on one machine. A selection that spans machines
+  is refused before anything is written. A preview made for one machine
+  cannot be applied on another.
+- A machine that does not answer, refuses the token or answers with a redirect
+  is shown as offline, sign-in refused or address refused. Its profiles are
+  hidden until it answers. The other machines keep working.
+- If a save on another machine loses its answer on the way back, that profile
+  is reported as uncertain. It is never retried or replayed. Reload to see
+  what was saved.
+
 ## What it does
 
 - **Overview** shows profiles, readable configs, profiles that route some tasks
@@ -60,7 +123,7 @@ HTTPS or Tailscale access.
 
 ## Safety and disclosures
 
-- No `.env`, `auth.json`, CLI login or other credential-store reads. Model
+- No direct `.env`, `auth.json`, CLI login or other credential-store reads. Model
   choices come through Hermes's own model-options route. Hermes owns credential
   handling and may refresh or probe provider catalogues. A listed model is not
   proof of login, entitlement or that it will answer.
@@ -94,8 +157,16 @@ HTTPS or Tailscale access.
 - Fast is offered only where Hermes's model catalog says the model and provider
   support it. On a custom endpoint it shows why it can't be verified instead.
   Whether your account is entitled to Fast is not something the plugin can know.
-- Not included are jobs, federation, login or refresh tooling and multi-machine
-  control.
+- Not included are jobs, federation, login or refresh tooling.
+- **Other machines (only if you configure them).** The board then makes
+  outbound HTTPS (or loopback/Tailscale HTTP) calls to the Hermes dashboards
+  you listed and nowhere else. Redirects are not followed and proxy settings
+  from the environment are not used, so a token is only sent to the address you
+  entered. Each machine's dashboard token is stored by Hermes in your `.env`
+  (as `FLEET_CONTROL_MACHINE_<n>_TOKEN`) and read through Hermes's documented
+  secret API. That token grants **full dashboard access** to that machine, so
+  treat it like a password. Tokens, addresses and endpoint values are never
+  sent to the browser.
 
 ## Compatibility and verification
 
@@ -109,12 +180,29 @@ saves. Stale previews, replayed tokens, unconfirmed saves, Fast on a custom
 endpoint and profiles with external secret sources were refused. Unticked
 profiles were left unchanged and no endpoint value reached the browser.
 
-The browser interface is unchanged from 2.0.0. Its earlier checks covered theme
-integration in Midnight, Hermes Teal, Mono, Ember and Nous Blue (light) at
+Version 2.2.0 adds other machines. It was exercised on the same pristine
+Hermes checkout with a synthetic main dashboard and two token-locked synthetic
+remote dashboards on loopback. The checks covered these cases.
+
+- the same profile name on two machines
+- preview, confirm, save and file readback on a remote profile
+- a selection across machines refused before any write
+- a wrong token, a stopped machine and a redirect
+- a lost save answer reported as uncertain and not replayed
+- stale previews
+- an http address outside the tailnet refused without being contacted
+
+With no machine configured, every board response matched 2.1.0. It has not yet
+been tried across a real tailnet.
+
+The browser interface with no other machine configured is unchanged from
+2.0.0. Its earlier checks covered theme integration in Midnight, Hermes Teal, Mono, Ember and Nous Blue (light) at
 390 px phone and desktop widths. Screenshots here use **synthetic profiles**.
 
-Hermes's admission validator passes. The plugin imports only `hermes_constants`
-and `hermes_yaml.safe_load` from Hermes, both on the published plugin API list.
+Hermes's admission validator passes. The plugin imports only `hermes_constants`,
+`hermes_yaml.safe_load`, `hermes_cli.config.load_config_readonly` (to read its
+own settings) and `agent.secret_scope.get_secret` (to read machine tokens) from
+Hermes, all on the published plugin API list.
 The 0.23.0 validator's older list still flags `hermes_yaml.safe_load`, while
 current Hermes lists it.
 
