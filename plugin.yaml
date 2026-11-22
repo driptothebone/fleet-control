@@ -1,5 +1,5 @@
 name: fleet-control
-version: "2.2.0"
+version: "2.2.1"
 description: "Phone-first bulk model routing with explicit preview and confirmation, saved through Hermes's public dashboard routes. Optionally also other machines' Hermes dashboards you configure. No credential-store reads."
 author: driptothebone
 requires_hermes: ">=0.23.0"

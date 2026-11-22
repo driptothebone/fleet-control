@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1
+
+- Main-model previews now distinguish the model window from the saved compaction ceiling. When a switch clears the old window override, the preview shows **Auto-detect** for the model window and reports the saved ceiling separately. The preview does not change the ceiling.
+
 ## 2.2.0
 
 - Optional other machines. Fill in up to four machine slots in the plugin's
