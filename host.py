@@ -65,6 +65,24 @@ def put(doc, key, value):
         node[parts[-1]] = value
 
 
+def compaction_ceiling(doc):
+    """Expose only the saved trigger ceiling, not a prediction of the runtime trigger."""
+    compression = doc.get('compression', {})
+    if not isinstance(compression, dict):
+        return {'status': 'unavailable'}
+    enabled = compression.get('enabled', True)
+    if enabled is False:
+        return {'status': 'disabled'}
+    if enabled is not True:
+        return {'status': 'unavailable'}
+    tokens = compression.get('threshold_tokens')
+    if tokens is None or type(tokens) is int and tokens <= 0:
+        return {'status': 'unconfigured'}
+    if type(tokens) is int and tokens < 2**53:
+        return {'status': 'configured', 'tokens': tokens}
+    return {'status': 'unavailable'}
+
+
 def aux_defaults_from(defaults):
     aux = defaults.get('auxiliary', {}) if isinstance(defaults, dict) else {}
     return {k: v for k, v in aux.items() if isinstance(k, str) and isinstance(v, dict)} if isinstance(aux, dict) else {}
@@ -434,8 +452,18 @@ class HostBoard:
                         'and may ask for a cost confirmation. ' if main else '')
             warning += ('Sequential saves through Hermes\'s public routes. Each profile is rechecked right before saving, '
                         'but Hermes has no conditional save yet, so a change in that instant is not caught. Not a fleet transaction.')
-            return {'fixture': False, 'token': token, 'profiles': [{'profile': p, 'changes': v['changes']} for p, v in plans.items()],
-                    'warning': warning}
+            rows = []
+            for p, plan in plans.items():
+                changes = plan['changes']
+                row = {'profile': p, 'changes': changes}
+                if any(c['field'] in ('model.provider', 'model.default') for c in changes):
+                    row['compaction_ceiling'] = compaction_ceiling(docs[p])
+                    if not any(c['field'] == 'model.context_length' for c in changes):
+                        window = field(docs[p], 'model.context_length')
+                        if not window['present'] or window['value'] in (None, 0):
+                            row['model_window_auto'] = True
+                rows.append(row)
+            return {'fixture': False, 'token': token, 'profiles': rows, 'warning': warning}
 
     def consume(self, d, token, confirmed):
         with self.lock:

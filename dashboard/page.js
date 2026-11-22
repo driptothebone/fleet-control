@@ -67,7 +67,7 @@ const view={
  * readback) lives in the controller above and is unchanged here.
  */
 const FIELD_LABEL={
-  'model.default':'Main model','model.provider':'Main provider','model.context_length':'Main context-length pin',
+  'model.default':'Main model','model.provider':'Main provider','model.context_length':'Model window',
   'agent.reasoning_effort':'Main effort','agent.service_tier':'Fast mode',
   'delegation.model':'Subagent model','delegation.provider':'Subagent provider','delegation.reasoning_effort':'Subagent effort',
   'delegation.max_concurrent_children':'Max subagents at once','fallback_providers':'Fallback chain'
@@ -464,6 +464,10 @@ function bulkBody(setting,profiles,targets){
     c.intent(draft);await c.preview();
   }
   function human(field,v){
+    if(field==='model.context_length'){
+      if(!v?.present||v.value===0||v.value==null)return 'Auto-detect';
+      if(Number.isSafeInteger(v.value)&&v.value>0)return v.value.toLocaleString()+' tokens (override)';
+    }
     if(!v||!v.present)return 'not set';
     const x=v.value;
     if(x===null)return 'null';
@@ -482,6 +486,17 @@ function bulkBody(setting,profiles,targets){
   function techHtml(changes){
     return `<details class="tech"><summary>Exact config fields</summary><dl>${changes.map(d=>`<dt>${esc(d.field)}</dt><dd><span class="old">${esc(view.value(d.before))}</span> → <span class="new">${esc(view.value(d.after))}</span></dd>`).join('')}</dl></details>`;
   }
+  function ceilingHtml(p){
+    if(!p.changes.some(c=>c.field==='model.default'||c.field==='model.provider'))return '';
+    const cap=p.compaction_ceiling;
+    let label='Not reported by this host';
+    if(cap?.status==='configured'&&Number.isSafeInteger(cap.tokens)&&cap.tokens>0)label=cap.tokens.toLocaleString()+' tokens · unchanged';
+    if(cap?.status==='unconfigured')label='No fixed ceiling configured · unchanged';
+    if(cap?.status==='disabled')label='Compaction disabled in saved config · unchanged';
+    if(cap?.status==='unavailable')label='Could not read saved setting';
+    const contextRow=(title, text)=>`<div class="chg"><div class="chg-k">${esc(title)}</div><div class="chg-v">${esc(text)}</div></div>`;
+    return (p.model_window_auto===true?contextRow('Model window','Auto-detect · unchanged'):'')+contextRow('Compaction ceiling',label);
+  }
   function renderPreview(){
     const out=$('#ed_out');if(!out)return;
     const s=c.state;
@@ -495,7 +510,7 @@ function bulkBody(setting,profiles,targets){
       <h3 id="reviewTitle">Review <span class="dim">· exact preview, nothing saved yet</span></h3>
       <p class="sum">${plural(profs.length,'profile')}${s.preview.machine&&multi()?' on '+esc(s.preview.machine.label):''} · ${plural(profs.reduce((n,p)=>n+p.changes.length,0),'field change')}${profs.length-changed?` · ${profs.length-changed} unchanged`:''}</p>
       ${fast?'<p class="warnline">Fast may consume more usage or cost more.</p>':''}
-      ${profs.map(p=>`<article class="change" data-preview-profile="${esc(p.profile)}"><header><b>${esc(labelFor(p.profile))}</b><span class="n">${p.changes.length?plural(p.changes.length,'change'):'unchanged'}</span></header>${p.changes.length?p.changes.map(changeHtml).join('')+techHtml(p.changes):'<p class="nochange">No field changes · nothing will be written</p>'}</article>`).join('')}
+      ${profs.map(p=>`<article class="change" data-preview-profile="${esc(p.profile)}"><header><b>${esc(labelFor(p.profile))}</b><span class="n">${p.changes.length?plural(p.changes.length,'change'):'unchanged'}</span></header>${p.changes.length?p.changes.map(changeHtml).join('')+ceilingHtml(p)+techHtml(p.changes):'<p class="nochange">No field changes · nothing will be written</p>'}</article>`).join('')}
       <div class="save-note">Saves one profile at a time — not all-or-nothing. <details><summary>What if one fails?</summary><span>Each profile is written in turn and reports its own outcome; profiles already saved are not rolled back. After a failure, reload and preview again — never replay. Host: ${esc(detail)}</span></details></div>
       <div class="applybar">
         <label class="confirmation"><input id="confirmation" type="checkbox"><span>I reviewed these exact changes for ${profs.length===1?esc(labelFor(profs[0].profile)):profs.length===2?'both profiles':'all '+profs.length+' profiles'}</span></label>
